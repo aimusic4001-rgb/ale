@@ -9,11 +9,13 @@ import { RatingModal } from '../components/RatingModal';
 import { calculatePriceWithStops, getCarTypePrice } from '../utils/priceCalculation';
 import { getETA } from '../utils/etaCalculation';
 import { firebaseService } from '../services/firebaseService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { useFirebaseRide } from '../hooks/useFirebaseRide';
 import { useMessageContext } from '../contexts/MessageContext';
 import { DriverLocation } from '../types';
+import { database } from '../config/firebase';
+import { ref, onValue, off } from 'firebase/database';
 
 interface DriverComingProps {
   destination: string;
@@ -49,9 +51,14 @@ export const DriverComing: React.FC<DriverComingProps> = ({
   onBack
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile } = useUserProfile();
   const { currentRide } = useFirebaseRide(currentRideId);
   const { unreadMessageCount, markMessagesAsRead } = useMessageContext();
+
+  const { orderType = 'ride', requestId, orderData = {} } = location.state || {};
+  const isFood = orderType === 'food';
+  const orderId = requestId || currentRideId;
 
   const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
   const [rideStatus, setRideStatus] = useState<string>('accepted');
@@ -63,9 +70,16 @@ export const DriverComing: React.FC<DriverComingProps> = ({
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [foodOrderDetails, setFoodOrderDetails] = useState<any>(null);
 
-  const priceCalculation = calculatePriceWithStops(pickup, destination, stops);
-  const finalPrice = getCarTypePrice(priceCalculation.totalPrice, carType);
+  const finalDestination = isFood ? orderData.destinationAddress : destination;
+  const finalPickup = isFood ? orderData.pickupAddress : pickup;
+  const finalStops = isFood ? (orderData.stops || []) : stops;
+  const finalCarType = isFood ? orderData.deliveryMode?.label : carType;
+  const finalPrice = isFood ? orderData.totalPrice : price;
+
+  const priceCalculation = !isFood ? calculatePriceWithStops(pickup, destination, stops) : null;
+  const displayPrice = isFood ? finalPrice : (priceCalculation ? getCarTypePrice(priceCalculation.totalPrice, carType) : finalPrice);
 
   const mockDriverInfo: DriverInfo = {
     id: 'driver123',
@@ -98,13 +112,32 @@ export const DriverComing: React.FC<DriverComingProps> = ({
     fetchDriverInfo();
   }, [currentRide]);
 
-  // Listen to ride status
+  // Listen to food order details if food order
   useEffect(() => {
-    if (!currentRideId) return;
+    if (!isFood || !orderId) return;
 
-    const unsubscribeStatus = firebaseService.listenToRideStatus(currentRideId, (statusData) => {
-      if (statusData) {
-        const newStatus = statusData.status;
+    const foodOrderRef = ref(database, `foodOrders/${orderId}`);
+    const unsubscribe = onValue(foodOrderRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setFoodOrderDetails(data);
+      }
+    });
+
+    return () => off(foodOrderRef, 'value', unsubscribe);
+  }, [isFood, orderId]);
+
+  // Listen to ride/food order status
+  useEffect(() => {
+    if (!orderId) return;
+
+    const collectionName = isFood ? 'foodOrders' : 'rides';
+    const orderRef = ref(database, `${collectionName}/${orderId}`);
+
+    const unsubscribe = onValue(orderRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const newStatus = data.status;
         setRideStatus(newStatus);
 
         if (newStatus === 'arrived' && !hasShownArrivalAlert) {
@@ -112,12 +145,22 @@ export const DriverComing: React.FC<DriverComingProps> = ({
           setHasShownArrivalAlert(true);
           setTimeout(() => setShowArrivalAlert(false), 5000);
         }
-        if (newStatus === 'completed') setIsRatingModalOpen(true);
+        if (newStatus === 'completed' || newStatus === 'delivered') {
+          setIsRatingModalOpen(true);
+        }
+
+        if (isFood && data.driverId && !driverInfo) {
+          firebaseService.getDriverInfo(data.driverId).then((driver) => {
+            if (driver) {
+              setDriverInfo(driver);
+            }
+          });
+        }
       }
     });
 
-    return () => unsubscribeStatus();
-  }, [currentRideId, hasShownArrivalAlert]);
+    return () => off(orderRef, 'value', unsubscribe);
+  }, [orderId, isFood, hasShownArrivalAlert, driverInfo]);
 
   // Listen to driver location
   useEffect(() => {
@@ -282,51 +325,113 @@ export const DriverComing: React.FC<DriverComingProps> = ({
 
           <ScrollableSection maxHeight="max-h-[420px]">
             <div className="space-y-6 pb-4">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <h3 className="font-semibold text-gray-900 mb-3">My route</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="flex-1 text-gray-700">{pickup}</span>
-                    <Edit className="text-gray-400" size={16} />
-                  </div>
-
-                  {stops.map((stop, index) => (
-                    <div key={index} className="flex items-center space-x-3 ml-6">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span className="flex-1 text-gray-700">{stop}</span>
-                      <Edit className="text-gray-400" size={16} />
-                    </div>
-                  ))}
-
-                  <div className="flex items-center space-x-3 ml-6">
-                    <Plus className="text-blue-600" size={16} />
-                    <span className="text-blue-600 font-medium">Add stop</span>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="text-blue-600" size={12} />
-                    <span className="flex-1 text-gray-700">{destination}</span>
-                    <Edit className="text-gray-400" size={16} />
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <h3 className="font-semibold text-gray-900 mb-3">Payment method</h3>
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <CreditCard className="text-green-600" size={20} />
-                      <div>
-                        <p className="font-medium text-gray-900">Cash</p>
-                        <p className="text-sm text-gray-500">Fare • {carType}</p>
+              {isFood ? (
+                <>
+                  {/* Food Order Details */}
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h3 className="font-semibold text-gray-900 mb-3">Food Items</h3>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {(foodOrderDetails?.items || orderData?.items || []).map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-gray-700">{item.name}</span>
+                            <span className="font-medium text-gray-900">R {item.price}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <span className="font-bold text-gray-900">R {finalPrice}</span>
-                  </div>
-                </div>
-              </motion.div>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h3 className="font-semibold text-gray-900 mb-3">Delivery route</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="flex-1 text-gray-700">{finalPickup}</span>
+                      </div>
+
+                      {finalStops.length > 0 && finalStops.map((stop: any, index: number) => (
+                        <div key={index} className="flex items-center space-x-3 ml-6">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="flex-1 text-gray-700">{stop.address || stop}</span>
+                        </div>
+                      ))}
+
+                      <div className="flex items-center space-x-3">
+                        <MapPin className="text-blue-600" size={12} />
+                        <span className="flex-1 text-gray-700">{finalDestination}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h3 className="font-semibold text-gray-900 mb-3">Payment summary</h3>
+                    <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Food subtotal</span>
+                        <span className="font-medium text-gray-900">R {foodOrderDetails?.foodSubtotal || orderData?.foodSubtotal || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Delivery fee</span>
+                        <span className="font-medium text-gray-900">R {foodOrderDetails?.deliveryFee || orderData?.deliveryFee || 0}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-gray-200">
+                        <span className="font-semibold text-gray-900">Total</span>
+                        <span className="text-lg font-bold text-gray-900">R {displayPrice}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  {/* Ride Details */}
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h3 className="font-semibold text-gray-900 mb-3">My route</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="flex-1 text-gray-700">{pickup}</span>
+                        <Edit className="text-gray-400" size={16} />
+                      </div>
+
+                      {stops.map((stop, index) => (
+                        <div key={index} className="flex items-center space-x-3 ml-6">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="flex-1 text-gray-700">{stop}</span>
+                          <Edit className="text-gray-400" size={16} />
+                        </div>
+                      ))}
+
+                      <div className="flex items-center space-x-3 ml-6">
+                        <Plus className="text-blue-600" size={16} />
+                        <span className="text-blue-600 font-medium">Add stop</span>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        <MapPin className="text-blue-600" size={12} />
+                        <span className="flex-1 text-gray-700">{destination}</span>
+                        <Edit className="text-gray-400" size={16} />
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <h3 className="font-semibold text-gray-900 mb-3">Payment method</h3>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <CreditCard className="text-green-600" size={20} />
+                          <div>
+                            <p className="font-medium text-gray-900">Cash</p>
+                            <p className="text-sm text-gray-500">Fare • {carType}</p>
+                          </div>
+                        </div>
+                        <span className="font-bold text-gray-900">R {finalPrice}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
+              )}
             </div>
           </ScrollableSection>
         </div>
@@ -392,10 +497,10 @@ export const DriverComing: React.FC<DriverComingProps> = ({
       <MessagePanel
         isOpen={isMessagePanelOpen}
         onClose={() => setIsMessagePanelOpen(false)}
-        rideId={currentRideId || ''}
+        rideId={orderId || ''}
         currentUserId={profile?.id || 'user123'}
         currentUserName={profile?.name || 'Client'}
-        driverId={currentRide?.driverId || 'driver123'}
+        driverId={(isFood ? foodOrderDetails?.driverId : currentRide?.driverId) || 'driver123'}
         driverName={driverInfo.name}
         isRideActive
       />

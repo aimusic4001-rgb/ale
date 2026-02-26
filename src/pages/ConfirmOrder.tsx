@@ -8,7 +8,7 @@ import { calculatePriceWithStops, getCarTypePrice } from '../utils/priceCalculat
 import { useRideContext } from '../contexts/RideContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { database } from '../config/firebase';
-import { addDoc, collection } from 'firebase/firestore';
+import { ref, push, set } from 'firebase/database';
 
 interface ConfirmOrderProps {
   destination: string;
@@ -79,8 +79,11 @@ export const ConfirmOrder: React.FC<ConfirmOrderProps> = ({
           userName: profile?.name || 'Unknown User'
         };
 
-        const docRef = await addDoc(collection(database, 'foodOrders'), foodOrder);
-        const foodOrderId = docRef.id;
+        const foodOrdersRef = ref(database, 'foodOrders');
+        const newFoodOrderRef = push(foodOrdersRef);
+        const foodOrderId = newFoodOrderRef.key!;
+
+        await set(newFoodOrderRef, foodOrder);
 
         localStorage.setItem('currentFoodOrderId', foodOrderId);
         localStorage.setItem('currentOrderType', 'food');
