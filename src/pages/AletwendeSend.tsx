@@ -115,7 +115,7 @@ export const AletwendeSend: React.FC = () => {
           transition={{ delay: 0.1, type: 'spring', damping: 20, stiffness: 300 }}
         >
           <h2 className="text-3xl font-bold text-gray-900 leading-tight">
-            What would you like to send?
+            Lets burn some energy with Aletwende🔥💪
           </h2>
           <p className="text-gray-500 mt-2">Choose a category to get started</p>
         </motion.div>
