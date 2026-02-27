@@ -28,6 +28,13 @@ export const AletwendeSend: React.FC = () => {
       color: 'bg-cyan-50 border-cyan-200 hover:border-cyan-300',
       description: 'Bulk delivery'
     },
+      {
+      id: 'clothes',
+      label: 'Clothes & Others',
+      icon: '👕',
+      color: 'bg-blue-50 border-blue-200 hover:border-blue-300',
+      description: 'Shopping delivery'
+    },
     {
       id: 'towing',
       label: 'Towing',
@@ -35,13 +42,7 @@ export const AletwendeSend: React.FC = () => {
       color: 'bg-orange-50 border-orange-200 hover:border-orange-300',
       description: 'Vehicle towing'
     },
-    {
-      id: 'clothes',
-      label: 'Clothes & Others',
-      icon: '👕',
-      color: 'bg-blue-50 border-blue-200 hover:border-blue-300',
-      description: 'Shopping delivery'
-    },
+     
     {
       id: 'hardware',
       label: 'Hardware',
