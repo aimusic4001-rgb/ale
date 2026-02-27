@@ -21,12 +21,19 @@ export const AletwendeSend: React.FC = () => {
       color: 'bg-pink-50 border-pink-200 hover:border-pink-300',
       description: 'Food delivery'
     },
-     {
+    {
       id: 'delivery-truck',
       label: 'Delivery Truck',
       icon: '🚚',
       color: 'bg-cyan-50 border-cyan-200 hover:border-cyan-300',
       description: 'Bulk delivery'
+    },
+    {
+      id: 'towing',
+      label: 'Towing',
+      icon: '🚗',
+      color: 'bg-orange-50 border-orange-200 hover:border-orange-300',
+      description: 'Vehicle towing'
     },
     {
       id: 'clothes',
@@ -35,14 +42,12 @@ export const AletwendeSend: React.FC = () => {
       color: 'bg-blue-50 border-blue-200 hover:border-blue-300',
       description: 'Shopping delivery'
     },
-    
     {
-      id: 'heavy-duty',
-      label: 'Heavy Duty',
+      id: 'hardware',
+      label: 'Hardware',
       icon: '🏗️',
-      color: 'bg-teal-600 hover:bg-teal-700',
-      description: 'Heavy equipment',
-      isDark: true
+      color: 'bg-amber-50 border-amber-200 hover:border-amber-300',
+      description: 'Building materials'
     }
   ];
 
@@ -69,6 +74,12 @@ export const AletwendeSend: React.FC = () => {
   const handleCategoryClick = (categoryId: string) => {
     if (categoryId === 'foodies') {
       navigate('/shop');
+    } else if (categoryId === 'package') {
+      navigate('/your-route', { state: { serviceType: 'package' } });
+    } else if (categoryId === 'towing') {
+      navigate('/your-route', { state: { serviceType: 'towing' } });
+    } else if (categoryId === 'delivery-truck') {
+      navigate('/your-route', { state: { serviceType: 'truck' } });
     }
   };
 
@@ -110,12 +121,12 @@ export const AletwendeSend: React.FC = () => {
 
         {/* Categories Grid */}
         <motion.div
-          className="grid grid-cols-2 gap-4 mb-4"
+          className="grid grid-cols-2 gap-4"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {categories.slice(0, 4).map((category) => (
+          {categories.map((category, index) => (
             <motion.button
               key={category.id}
               onClick={() => handleCategoryClick(category.id)}
@@ -123,6 +134,7 @@ export const AletwendeSend: React.FC = () => {
               variants={itemVariants}
               whileTap={{ scale: 0.98 }}
               whileHover={{ y: -4 }}
+              transition={{ delay: index * 0.05, type: 'spring', damping: 12, stiffness: 100 }}
             >
               <div className="text-5xl mb-3">{category.icon}</div>
               <h3 className={`font-bold text-lg ${category.isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -134,26 +146,6 @@ export const AletwendeSend: React.FC = () => {
             </motion.button>
           ))}
         </motion.div>
-
-        {/* Heavy Duty - Full Width */}
-        <motion.button
-          onClick={() => handleCategoryClick('heavy-duty')}
-          className="w-full p-6 rounded-3xl border-2 bg-teal-600 border-teal-600 hover:bg-teal-700 transition-all active:scale-95"
-          variants={itemVariants}
-          initial="hidden"
-          animate="visible"
-          transition={{ delay: 0.4, type: 'spring', damping: 12, stiffness: 100 }}
-          whileTap={{ scale: 0.98 }}
-          whileHover={{ y: -4 }}
-        >
-          <div className="flex items-center space-x-4">
-            <div className="text-5xl">🏗️🧱🏠🔌🧵</div>
-            <div className="text-left">
-              <h3 className="font-bold text-xl text-white">Hardware</h3>
-              <p className="text-sm text-gray-100 mt-1">Building materials & equipments</p>
-            </div>
-          </div>
-        </motion.button>
       </div>
     </div>
   );

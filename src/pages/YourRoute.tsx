@@ -11,17 +11,22 @@ interface YourRouteProps {
   onRouteComplete?: (pickup: string, destination: string, stops: string[]) => void;
 }
 
+type ServiceType = 'ride' | 'package' | 'towing' | 'truck';
+
 export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { address: currentLocation, loading: locationLoading } = useGeolocation();
-  
+
+  const serviceType: ServiceType = location.state?.serviceType || 'ride';
+
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [stops, setStops] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<'pickup' | 'destination' | number>('destination');
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState(getAddressSuggestions(''));
+  const [extraOption, setExtraOption] = useState('');
 
   useEffect(() => {
     if (currentLocation && !pickup) {
@@ -172,10 +177,91 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
     return 'Add stop';
   };
 
-  // Function to determine if a field should have the green glow
   const isFieldActive = (field: 'pickup' | 'destination' | number): boolean => {
     return activeField === field;
   };
+
+  const getButtonLabel = (): string => {
+    switch (serviceType) {
+      case 'towing':
+        return 'Go to Select Tow';
+      case 'package':
+        return 'Go to Select Delivery';
+      case 'truck':
+        return 'Go to Select Truck';
+      default:
+        return '';
+    }
+  };
+
+  const renderTowingOptions = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mt-6 p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border border-orange-200"
+    >
+      <label className="block text-sm font-semibold text-gray-900 mb-3">What's your vehicle?</label>
+      <select
+        value={extraOption}
+        onChange={(e) => setExtraOption(e.target.value)}
+        className="w-full bg-white border-2 border-orange-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+      >
+        <option value="">Select vehicle type</option>
+        <option value="sedan">Sedan</option>
+        <option value="suv">SUV</option>
+        <option value="bakkie">Bakkie</option>
+        <option value="small-truck">Small Truck</option>
+        <option value="van">Van</option>
+      </select>
+    </motion.div>
+  );
+
+  const renderPackageOptions = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mt-6 p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl border border-gray-300"
+    >
+      <label className="block text-sm font-semibold text-gray-900 mb-3">What's the weight of your package?</label>
+      <select
+        value={extraOption}
+        onChange={(e) => setExtraOption(e.target.value)}
+        className="w-full bg-white border-2 border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all"
+      >
+        <option value="">Select weight</option>
+        <option value="0-5kg">0–5 kg</option>
+        <option value="5-10kg">5–10 kg</option>
+        <option value="10-20kg">10–20 kg</option>
+        <option value="20-50kg">20–50 kg</option>
+      </select>
+    </motion.div>
+  );
+
+  const renderTruckOptions = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mt-6 p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl border border-cyan-200"
+    >
+      <label className="block text-sm font-semibold text-gray-900 mb-3">What do you want to move?</label>
+      <select
+        value={extraOption}
+        onChange={(e) => setExtraOption(e.target.value)}
+        className="w-full bg-white border-2 border-cyan-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
+      >
+        <option value="">Select item type</option>
+        <option value="house-shifting">House Shifting</option>
+        <option value="farm-produce">Farm Produce</option>
+        <option value="construction-material">Construction Material</option>
+        <option value="building-sand">Building Sand</option>
+        <option value="furniture">Furniture</option>
+        <option value="bulk-goods">Bulk Goods</option>
+      </select>
+    </motion.div>
+  );
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gray-50">
@@ -293,8 +379,8 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
                 onFocus={() => handleFieldFocus('destination')}
                 placeholder={getPlaceholder('destination')}
                 className={`w-full bg-gray-100 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none transition-all ${
-                  isFieldActive('destination') 
-                    ? 'ring-2 ring-green-500 bg-white shadow-lg shadow-green-500/20 border-2 border-green-500' 
+                  isFieldActive('destination')
+                    ? 'ring-2 ring-green-500 bg-white shadow-lg shadow-green-500/20 border-2 border-green-500'
                     : 'focus:ring-2 focus:ring-green-500 focus:bg-white'
                 }`}
               />
@@ -308,6 +394,10 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
               </div>
             </div>
           </div>
+
+          {serviceType === 'towing' && renderTowingOptions()}
+          {serviceType === 'package' && renderPackageOptions()}
+          {serviceType === 'truck' && renderTruckOptions()}
 
           {/* Address Suggestions */}
           <ScrollableSection maxHeight="max-h-96">
@@ -353,6 +443,42 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
             </div>
           </ScrollableSection>
         </div>
+
+        {/* Dynamic Bottom Button - Only for non-ride services */}
+        {serviceType !== 'ride' && (
+          <motion.div
+            className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, type: 'spring', damping: 20, stiffness: 300 }}
+          >
+            <motion.button
+              onClick={() => {
+                if (pickup && destination && extraOption) {
+                  navigate('/select-ride', {
+                    state: {
+                      serviceType,
+                      pickup,
+                      destination,
+                      stops,
+                      extraOption
+                    }
+                  });
+                }
+              }}
+              disabled={!pickup || !destination || !extraOption}
+              className={`w-full py-4 px-6 rounded-2xl font-bold text-lg transition-all ${
+                !pickup || !destination || !extraOption
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl'
+              }`}
+              whileTap={!pickup || !destination || !extraOption ? {} : { scale: 0.98 }}
+              whileHover={!pickup || !destination || !extraOption ? {} : { y: -2 }}
+            >
+              {getButtonLabel()}
+            </motion.button>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );
